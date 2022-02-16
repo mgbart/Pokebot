@@ -24,6 +24,8 @@ collection = db['trainers']
 doc_count = collection.count_documents({})
 print(doc_count)
 
+
+
 def getTrainer(trainerId):
     #trainerId = str(trainerId)
     try:
@@ -42,11 +44,26 @@ def registerTrainer(trainerId, dscName):
     except Exception as e:
         raise
 
+startingPokemons = {'#1': 'Bulbausaur', '#4': 'Charmander', '#7' : 'Squirtle'}
 
 def getPokemon(id):
     api_url = "https://pokeapi.co/api/v2/pokemon/" + id
     pokemon = requests.get(api_url).json()
     return pokemon
+
+def randomizePokemon():
+    pass
+
+def capturePokemon():
+    pass
+
+def chooseStartingPokemon(id):
+    chosenP = getPokemon(id)
+    if chosenP['name'].capitalize() in startingPokemons.values():
+        return chosenP
+    else:
+        return 'ERROR'
+
 
 @bot.event
 async def on_ready():
@@ -60,13 +77,12 @@ async def register(ctx):
     #check if user exists in db
     print(ctx.author.id)
     if getTrainer(ctx.author.id):
-        await ctx.send('{} is already registered.'.format(ctx.author.name))
+        await ctx.send('{}, you are already registered! Please choose your first companion:\n {}'.format(ctx.author.name,'\n'.join('{} {}'.format(key, value) for key, value in startingPokemons.items())))
     else:
-        await ctx.send('{} is not registered.'.format(ctx.author.name))
+        await ctx.send('Welcome {}! Please choose your first companion:\n {}'.format(ctx.author.name,'\n'.join('{} {}'.format(key, value) for key, value in startingPokemons.items())))
+
+        #chooseStartingPokemon()
         registerTrainer(ctx.author.id, ctx.author.name)
-        
-
-
 
 
 @bot.command()
