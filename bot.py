@@ -2,8 +2,10 @@ import os
 import requests
 import discord
 from discord.ext import commands
+import random
 from dotenv import load_dotenv
 from pymongo import MongoClient
+import asyncio
 
 
 
@@ -11,7 +13,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 
-client = discord.Client()
+#client = discord.Client()
 bot = commands.Bot(command_prefix='$')
 
 
@@ -44,7 +46,7 @@ def registerTrainer(trainerId, dscName):
     except Exception as e:
         raise
 
-startingPokemons = {'#1': 'Bulbausaur', '#4': 'Charmander', '#7' : 'Squirtle'}
+startingPokemons = {'#1': 'Bulbasaur', '#4': 'Charmander', '#7' : 'Squirtle'}
 
 def getPokemon(id):
     api_url = "https://pokeapi.co/api/v2/pokemon/" + id
@@ -65,24 +67,61 @@ def chooseStartingPokemon(id):
         return 'ERROR'
 
 
-@bot.event
-async def on_ready():
-    print('Logged in as')
-    print(bot.user.name)
-    print(bot.user.id)
-    print('------')
+class PokeClient(discord.Client):
+    async def on_ready(self):
+        print(f'Logged in as {self.user} (ID: {self.user.id})')
+        print('------')
 
-@bot.command()
-async def register(ctx):
-    #check if user exists in db
-    print(ctx.author.id)
-    if getTrainer(ctx.author.id):
-        await ctx.send('{}, you are already registered! Please choose your first companion:\n {}'.format(ctx.author.name,'\n'.join('{} {}'.format(key, value) for key, value in startingPokemons.items())))
-    else:
-        await ctx.send('Welcome {}! Please choose your first companion:\n {}'.format(ctx.author.name,'\n'.join('{} {}'.format(key, value) for key, value in startingPokemons.items())))
+    async def on_message(self, message):
+        # we do not want the bot to reply to itself
+        if message.author.id == self.user.id:
+            return
 
-        #chooseStartingPokemon()
-        registerTrainer(ctx.author.id, ctx.author.name)
+
+        if message.content.startswith('$register'):
+            if getTrainer(message.author.id):
+                await message.channel.send('{}, you are already registered!'.format(message.author.name) )
+
+            else:
+                await message.channel.send('Welcome {}! Please choose your first companion:\n {}'.format(message.author.name,'\n'.join('{} {}'.format(key, value) for key, value in startingPokemons.items())))
+
+                def is_correct(m):
+                    return m.author == message.author
+
+                try:
+                    option = await self.wait_for('message', check=is_correct, timeout=5.0)
+                    choosenPokemon = chooseStartingPokemon(option.content)
+                except asyncio.TimeoutError:
+                    return await message.channel.send(f'Sorry, you took too long.')
+
+
+                if choosenPokemon != 'ERROR':
+                    await message.channel.send('Yay! You got a young {}'.format(choosenPokemon['name'].capitalize()))
+                    print(choosenPokemon)
+                else:
+                    await message.channel.send('Sorry, that is not a valid Pokemon.')
+                    print(choosenPokemon)
+                # registerTrainer(message.author.id, message.author.name)
+
+
+
+        if message.content.startswith('$guess'):
+            await message.channel.send('Guess a number between 1 and 10.')
+
+            def is_correct(m):
+                return m.author == message.author and m.content.isdigit()
+
+            answer = random.randint(1, 10)
+
+            try:
+                guess = await self.wait_for('message', check=is_correct, timeout=5.0)
+            except asyncio.TimeoutError:
+                return await message.channel.send(f'Sorry, you took too long it was {answer}.')
+
+            if int(guess.content) == answer:
+                await message.channel.send('You are right!')
+            else:
+                await message.channel.send(f'Oops. It is actually {answer}.')
 
 
 @bot.command()
@@ -90,13 +129,5 @@ async def pokedex(ctx,id):
     pokemon = getPokemon(id)
     await ctx.send('#{} {} '.format(pokemon['id'], pokemon['name'].capitalize()))
 
-bot.run(TOKEN)
-
-
-
-
-
-
-
-
-print(response['name'].capitalize())
+client = PokeClient()
+client.run(TOKEN)
